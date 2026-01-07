@@ -1,0 +1,54 @@
+name: Build (Windows + macOS)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["build"]
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+        python-version: ["3.11"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pillow pyinstaller
+
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller --windowed --onefile --name Jpg2Pdf jpg2pdf.py
+
+      # macOS: 把 .app 打成 zip（更好下载/分发）
+      - name: Zip macOS app
+        if: runner.os == 'macOS'
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent "dist/Jpg2Pdf.app" "dist/Jpg2Pdf-mac.zip"
+
+      - name: Upload artifact (Windows exe)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Jpg2Pdf-windows
+          path: dist/Jpg2Pdf.exe
+
+      - name: Upload artifact (macOS app zip)
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Jpg2Pdf-macos
+          path: dist/Jpg2Pdf-mac.zip
